@@ -4,7 +4,7 @@ from PIL import Image
 
 
 # Create a 3D LUT
-num_bins = 64
+num_bins = 32
 color_bit_depth = 8
 bin_width = 2**color_bit_depth // num_bins
 
@@ -84,17 +84,6 @@ def rgb_to_hsv(rgb):
     return hsv
 
 lut_hsv = rgb_to_hsv(lut_rgb)
-# for r_idx in range(num_bins):
-#     for g_idx in range(num_bins):
-#         for b_idx in range(num_bins):
-#             # OpenCV expects BGR order
-#             bgr = lut_rgb[r_idx, g_idx, b_idx][2], lut_rgb[r_idx, g_idx, b_idx][1], lut_rgb[r_idx, g_idx, b_idx][0]
-#             bgr = np.array(bgr, dtype=np.uint8)#.reshape(1, 1, 3)
-#
-#             hsv_color = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
-#
-#             # Store HSV in the LUT (float32)
-#             lut_hsv[r_idx, g_idx, b_idx] = hsv_color
 
 
 hue_to_color = {
@@ -148,10 +137,56 @@ for index in np.ndindex(color_map.shape):
 
 # Test:
 r, g, b = 0, 0, 31
-print("Bin index:", (r, g, b))
+print("Green:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
 print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+r, g, b = 0, 20, 0
+print("Blue:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+
+r, g, b = 15, 0, 0
+print("Red:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+
+r, g, b = 15, 15, 0
+print("Yellow:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+r, g, b = 0, 0, 0
+print("Black:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+r, g, b = 31, 31, 31
+print("White:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
+r, g, b = 12, 12, 12
+print("Grey:", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("")
+
 
 # Save the LUTs
 np.save("lut_hsv.npy", lut_hsv)
