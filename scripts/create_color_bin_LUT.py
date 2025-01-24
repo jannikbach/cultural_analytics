@@ -191,8 +191,8 @@ print("")
 
 
 # Save the LUTs
-np.save("lut_hsv.npy", lut_hsv)
+np.save("../lut_hsv.npy", lut_hsv)
 
 # Save to 'color_buckets.pkl'
-with open("color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
+with open("../color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
     pickle.dump(color_buckets, f)
