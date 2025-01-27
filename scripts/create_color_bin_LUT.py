@@ -1,14 +1,11 @@
 import pickle
-
 import numpy as np
-import cv2
-from PIL import Image
 
 
 # Create a 3D LUT
-num_bins = 32
+num_bins = 256
 color_bit_depth = 8
-bin_width = 2**color_bit_depth // num_bins
+bin_width = 1#2**color_bit_depth // num_bins
 
 # Initialize the LUT: (num_bins, num_bins, num_bins, 3)
 lut_rgb = np.zeros((num_bins, num_bins, num_bins, 3), dtype=np.float32)
@@ -122,7 +119,7 @@ color_buckets = {
 }
 
 
-saturation_threshold = 2 ** color_bit_depth // 10
+saturation_threshold = 2 ** color_bit_depth // 10 #colors with less saturation than this will be considered gray
 color_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
 for index in np.ndindex(color_map.shape):
     r, g, b = index
@@ -183,7 +180,7 @@ print("Color by Map :", color_buckets[color_map[r, g, b]])
 print("")
 
 r, g, b = 12, 12, 12
-print("Grey:", (r, g, b))
+print("Gray:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
 print("Color by Map :", color_buckets[color_map[r, g, b]])
@@ -191,7 +188,7 @@ print("")
 
 
 # Save the LUTs
-np.save("../lut_hsv.npy", lut_hsv)
+np.save("../lut_hsv.npy", color_map)
 
 # Save to 'color_buckets.pkl'
 with open("../color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
