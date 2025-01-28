@@ -7,7 +7,7 @@ import requests
 from io import BytesIO
 from tqdm import tqdm
 
-tqdm.pandas()
+VERBOSE = False
 
 df = pd.read_csv('.fetched_data/discogs_releases.csv', sep=",", quotechar='"')
 
@@ -41,7 +41,9 @@ def calculate_dominant_color(row):
     try:
         image = load_image_from_url(url)
     except Exception as e:
-        print(f"Failed to load {url}: {e}")
+        if VERBOSE:
+            id = row["Id"]
+            print(f"ID {id}: Failed to load {url}: {e}")
         return 'N/A'
 
     color_map_image = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
@@ -62,8 +64,11 @@ def calculate_dominant_color(row):
     return top3_colors
 
 
-df["dominant_colors"] = df.apply(calculate_dominant_color, axis=1)
-
-print(df.head())
+# start
+print("Calculating dominant colors...")
+tqdm.pandas()
+df["dominant_colors"] = df.progress_apply(calculate_dominant_color, axis=1)
+if VERBOSE:
+    print("Done!")
 
 df.to_csv('dicogs_with_colors.csv', index=False)
