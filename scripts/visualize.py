@@ -4,6 +4,8 @@ import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
+import matplotlib.colors as mcolors
+
 
 VERBOSE = False
 LAME_PLOT = False
@@ -150,11 +152,23 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
         radii = radii / np.max(radii)
 
         colors = list(histogram.keys())
+
+        # Function to convert color to pastel by blending with white
+        def pastel_color(color, mix=0.5):
+            c = plt_color_map[color]
+            rgb = np.array(mcolors.to_rgb(c))  # Convert to RGB
+            white = np.array([1, 1, 1])  # White color in RGB
+            return (1 - mix) * rgb + mix * white  # Blend with white
+
+        # Create pastel colors
+        pastel_colors = [pastel_color(c, mix=0.35) for c in colors]
+        colors = pastel_colors
+
         width = 2 * np.pi / N * np.ones(N)
         bars = ax.bar(theta, radii, width=width, bottom=0.0, align='edge',
                       edgecolor='0.3', lw=lw_bars)
         for color, bar in zip(colors, bars):
-            color_plt = plt_color_map[color]  # map to matplotlib color
+            color_plt = color  # map to matplotlib color
             bar.set_facecolor(color_plt)
 
         ax.tick_params(labelbottom=False, labeltop=False,
