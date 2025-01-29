@@ -92,11 +92,11 @@ hue_to_color = {
     90: "Chartreuse",
     120: "Green",
     150: "Spring Green",
-    180: "Cyan/Aqua",
+    180: "Cyan",
     210: "Azure",
     240: "Blue",
     270: "Violet",
-    300: "Magenta/Fuchsia",
+    300: "Magenta",
     330: "Rose",
     360: "Red"  # 360° wraps around to Red
 }
@@ -117,36 +117,53 @@ color_buckets = {
     13: "White",
     14: "Gray"
 }
-
+color_to_bucket = {color: bucket for bucket, color in color_buckets.items()}
 
 saturation_threshold = 2 ** color_bit_depth // 10 #colors with less saturation than this will be considered gray
-color_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
-for index in np.ndindex(color_map.shape):
+hue_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+for index in np.ndindex(hue_map.shape):
     r, g, b = index
     hsv = lut_hsv[r, g, b]
     if hsv[1] < saturation_threshold:
         if hsv[2] < (2**color_bit_depth / 3):
-            color_map[r, g, b] = 12 # black
+            hue_map[r, g, b] = 12 # black
         elif hsv[2] > (2*(2**color_bit_depth) / 3):
-            color_map[r, g, b] = 13 # white
+            hue_map[r, g, b] = 13 # white
         else:
-            color_map[r, g, b] = 14 # gray
+            hue_map[r, g, b] = 14 # gray
     else:
-        color_map[r, g, b] = hsv[0] // 30
+        # find the closest hue
+        closest_key = min(hue_to_color.keys(), key=lambda k: abs(k - hsv[0]))
+        closest_hue = hue_to_color[closest_key]
+        bucket = color_to_bucket.get(closest_hue)
+        hue_map[r, g, b] = bucket
+
+sat_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+for index in np.ndindex(sat_map.shape):
+    r, g, b = index
+    hsv = lut_hsv[r, g, b]
+    sat_map[r, g, b] = hsv[1]
+
+val_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+for index in np.ndindex(val_map.shape):
+    r, g, b = index
+    hsv = lut_hsv[r, g, b]
+    val_map[r, g, b] = hsv[2]
+
 
 # Test:
 r, g, b = 0, 0, 31
 print("Green:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 r, g, b = 0, 20, 0
 print("Blue:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 
@@ -154,7 +171,7 @@ r, g, b = 15, 0, 0
 print("Red:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 
@@ -162,33 +179,42 @@ r, g, b = 15, 15, 0
 print("Yellow:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 r, g, b = 0, 0, 0
 print("Black:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 r, g, b = 31, 31, 31
 print("White:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 r, g, b = 12, 12, 12
 print("Gray:", (r, g, b))
 print("RGB:", lut_rgb[r, g, b])
 print("HSV:", lut_hsv[r, g, b])
-print("Color by Map :", color_buckets[color_map[r, g, b]])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
+print("")
+
+r, g, b = 255, 68, 0
+print("Should Be Orange not Red (Hue 16):", (r, g, b))
+print("RGB:", lut_rgb[r, g, b])
+print("HSV:", lut_hsv[r, g, b])
+print("Color by Map :", color_buckets[hue_map[r, g, b]])
 print("")
 
 
 # Save the LUTs
-np.save("../lut_hsv.npy", color_map)
+np.save("../lut_hue.npy", hue_map)
+np.save("../lut_sat.npy", sat_map)
+np.save("../lut_val.npy", val_map)
 
 # Save to 'color_buckets.pkl'
 with open("../color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
