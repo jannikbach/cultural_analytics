@@ -1,74 +1,123 @@
-import numpy
-import pandas as pd
-import numpy as np
-from skimage import io
+from pathlib import Path
+import logging
+from typing import Dict, Tuple, Optional
 import pickle
+
+import numpy as np
+import pandas as pd
 import requests
-from io import BytesIO
+from skimage import io
 from tqdm import tqdm
+from io import BytesIO
+from dataclasses import dataclass
 
-VERBOSE = False
-
-df = pd.read_csv('.fetched_data/discogs_releases.csv', sep=",", quotechar='"')
-
-color_lut_256 = numpy.load('../lut_hsv.npy')
-
-file = open("../color_buckets.pkl", 'rb')
-color_map_idx_to_string = pickle.load(file)
-file.close()
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
-def calculate_dominant_color(row):
-    url = row["Cover URL"]
+@dataclass(frozen=True)
+class Config:
+    base_path: Path = Path("../")
+    data_path: Path = Path("./.fetched_data/")
+    lut_names: Tuple[str, ...] = ("hue", "sat", "val")
+    input_csv: Path = data_path / "discogs_releases_6000.csv"
+    output_csv: Path = data_path / "discogs_with_colors.csv"
 
-    # load image dynamially
-    def load_image_from_url(url):
-        # Pretend to be a regular browser
-        headers = {"User-Agent": "Mozilla/5.0"}
 
-        # 1. Fetch image data (raise_for_status() ensures an error if not 200 OK)
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+class ImageProcessingError(Exception):
+    """Custom exception for image processing failures"""
 
-        # 2. Convert to a file-like object
-        file_like = BytesIO(response.content)
 
-        # 3. Now read it with skimage
-        image = io.imread(file_like)
+class ColorAnalyzer:
+    """Analyzes color characteristics of images using precomputed LUTs"""
 
-        return image
+    def __init__(self, config: Config = Config()):
+        self.config = config
+        self.luts = self._load_luts()
+        self.color_map = self._load_color_map()
+
+    def _load_luts(self) -> Dict[str, np.ndarray]:
+        """Load lookup tables from numpy files"""
+        return {
+            name: np.load(self.config.base_path / f"lut_{name}.npy")
+            for name in self.config.lut_names
+        }
+
+    def _load_color_map(self) -> Dict[int, str]:
+        """Load color name mapping using context manager"""
+        with open(self.config.base_path / "color_buckets.pkl", "rb") as f:
+            return pickle.load(f)
+
+    @staticmethod
+    def load_image(url: str) -> Optional[np.ndarray]:
+        """Fetch image from URL with proper error handling"""
+        try:
+            response = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0"},
+                timeout=10
+            )
+            response.raise_for_status()
+            return io.imread(BytesIO(response.content))
+        except Exception as e:
+            logger.debug(f"Image load failed for {url}: {str(e)}")
+            return None
+
+    def analyze(self, image: np.ndarray) -> Dict[str, float | str]:
+        """Analyze image and return color metrics"""
+        try:
+            color_map = self.luts["hue"][image[..., 0], image[..., 1], image[..., 2]]
+            sat_map = self.luts["sat"][image[..., 0], image[..., 1], image[..., 2]]
+            val_map = self.luts["val"][image[..., 0], image[..., 1], image[..., 2]]
+
+            return {
+                "colors": self._top_colors(color_map),
+                "saturation": sat_map.mean(),
+                "value": val_map.mean()
+            }
+        except IndexError as e:
+            raise ImageProcessingError(f"Invalid image dimensions: {e}") from e
+
+    def _top_colors(self, color_map: np.ndarray) -> str:
+        """Extract top 3 colors from color map"""
+        counts = np.bincount(color_map.ravel())
+        top_indices = np.argsort(counts)[-3:][::-1]
+        return ",".join(self.color_map[idx] for idx in top_indices)
+
+
+def process_data(df: pd.DataFrame, analyzer: ColorAnalyzer) -> pd.DataFrame:
+    """Process DataFrame with image analysis"""
+
+    def analyze_row(row: pd.Series) -> Dict[str, float | str]:
+        if (image := analyzer.load_image(row["Cover URL"])) is not None:
+            try:
+                return analyzer.analyze(image)
+            except ImageProcessingError as e:
+                logger.debug(f"Processing failed for {row.name}: {e}")
+        return {"colors": "N/A", "saturation": np.nan, "value": np.nan}
+
+    logger.info("Analyzing album covers...")
+    tqdm.pandas(desc="Processing images")
+    results = df.progress_apply(analyze_row, axis=1, result_type="expand")
+    return pd.concat([df, results], axis=1)
+
+
+def main():
+    """Main processing pipeline"""
+    config = Config()
+    analyzer = ColorAnalyzer(config)
 
     try:
-        image = load_image_from_url(url)
+        df = pd.read_csv(config.input_csv, sep=",", quotechar='"')
+        processed_df = process_data(df, analyzer)
+        processed_df.to_csv(config.output_csv, index=False)
+        logger.info(f"Successfully processed {len(df)} entries")
+    except FileNotFoundError as e:
+        logger.error(f"File operation failed: {e}")
     except Exception as e:
-        if VERBOSE:
-            id = row["Id"]
-            print(f"ID {id}: Failed to load {url}: {e}")
-        return 'N/A'
-
-    color_map_image = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-
-    for i in range(image.shape[0]):
-        for j in range(image.shape[1]):
-            # image[i,j] is the rgb value of a pixel in the jpg
-            # color_lut_256 is the color of that pixel
-            rgb = image[i, j]
-            color = color_lut_256[rgb[0], rgb[1], rgb[2]]
-            color_map_image[i, j] = color
-
-    flat = color_map_image.ravel()
-    counts = np.bincount(flat)
-    top3_colors_idx = np.argsort(counts)[-3:][::-1]
-    top3_colors = ",".join(color_map_idx_to_string[x] for x in top3_colors_idx)
-
-    return top3_colors
+        logger.error(f"Unexpected error: {e}", exc_info=True)
 
 
-# start
-print("Calculating dominant colors...")
-tqdm.pandas()
-df["dominant_colors"] = df.progress_apply(calculate_dominant_color, axis=1)
-if VERBOSE:
-    print("Done!")
-
-df.to_csv('dicogs_with_colors.csv', index=False)
+if __name__ == "__main__":
+    main()
