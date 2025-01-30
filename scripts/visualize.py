@@ -34,7 +34,7 @@ for subgenre in subgenres:
             df['Subgenres'].str.contains(subgenre) & ~df['Subgenres'].str.contains('Hard ' + subgenre)].copy()
 
     # get the unique colors from the current subgenre, only get the first color
-    subgenre_rows['Most dominant Color'] = df['Dominant Colors'].str.split(',').str[0]
+    subgenre_rows['Most dominant Color'] = df['colors'].str.split(',').str[0]
 
     # count the colors
     for color in subgenre_rows['Most dominant Color']:
@@ -110,7 +110,7 @@ if LAME_PLOT:
     plt.show()
 
 
-def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
+def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram, max_value=None):
     """
     Create a polar Axes containing the histogram radar plot.
 
@@ -130,6 +130,8 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
     histogram : dict
         The histogram to plot. The keys are the colors and the values are the
         frequencies.
+    max_value : float
+        The maximum value of the histogram used for scaling.
 
     Returns
     -------
@@ -142,6 +144,7 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
         ax.set_axisbelow(True)
 
         N = len(histogram)
+        pad = np.sqrt(0.1)
         arc = 2. * np.pi
         theta = np.arange(0.0, arc, arc / N)
         radii_value = np.array(list(histogram.values()))
@@ -149,7 +152,7 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
         # this matches values of the histogram with the area of the bars
         radii = np.sqrt(radii_value)
         # normalize the radii
-        radii = radii / np.max(radii)
+        # radii = radii / np.max(radii)
 
         colors = list(histogram.keys())
 
@@ -175,8 +178,12 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
                        labelleft=False, labelright=False)
 
         ax.grid(lw=lw_grid, color='0.9')
-        ax.set_rmax(1.05)
-        y_ticks = np.sqrt(np.linspace(0, 1, 5)[1:])
+        if (max_value is not None) and (max_value > 0):
+            r_max = max_value * (1 + pad)
+        else:
+            r_max = np.max(radii) * (1 + pad)
+        ax.set_rmax(r_max)
+        y_ticks = np.sqrt(np.arange(0, r_max, 0.1)[1:])
         ax.set_yticks(y_ticks)
 
         # the actual visible background - extends a bit beyond the axis
@@ -186,7 +193,7 @@ def create_hist_axes(fig, ax_position, lw_bars, lw_grid, lw_border, histogram):
         return ax
 
 
-def make_circle_histogram(height_px, lw_bars, lw_grid, lw_border, historagm, title):
+def make_circle_histogram(height_px, lw_bars, lw_grid, lw_border, histogram, title, max_value=None):
     """
     Create a full figure with the Color Circle Histogram. (A Histogram in polar coordinates)
 
@@ -214,7 +221,7 @@ def make_circle_histogram(height_px, lw_bars, lw_grid, lw_border, historagm, tit
     fig.suptitle(title)
 
     ax_pos = (0.03, 0.03, .94, .94)
-    ax = create_hist_axes(fig, ax_pos, lw_bars, lw_grid, lw_border, historagm)
+    ax = create_hist_axes(fig, ax_pos, lw_bars, lw_grid, lw_border, histogram, max_value)
 
     return fig, ax
 
@@ -224,9 +231,19 @@ file_types = ['svg', 'png']
 for file_type in file_types:
     Path(f'../figures/{file_type}').mkdir(parents=True, exist_ok=True)
 
+max_value = 0
 for genre, hist in subgenre_color_histogram.items():
+    count = sum(hist.values())
+    for color, value in hist.items():
+        normalized = value / count
+        if normalized > max_value:
+            max_value = normalized
+        hist[color] = normalized
+
+for genre, hist in subgenre_color_histogram.items():
+    print(sum(hist.values()))
     fig, ax = make_circle_histogram(height_px=500, lw_bars=0.7, lw_grid=0.5, lw_border=1,
-                                    historagm=hist, title=genre)
+                                    histogram=hist, title=genre, max_value=max_value)
     for file_type in file_types:
         plt.savefig(f'../figures/{file_type}/{genre.lower().replace(" ", "_")}_radial_hist.{file_type}')
     if VERBOSE:
