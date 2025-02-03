@@ -5,6 +5,8 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from scipy.stats import shapiro, levene, ttest_ind, mannwhitneyu
+import seaborn as sns
+import matplotlib.pyplot as plt
 
 
 @dataclass(frozen=True)
@@ -14,7 +16,8 @@ class Config:
     csv: Path = data_path / "discogs_with_colors.csv"
     subgenres = ['House','Techno', 'Trance']
     prefix = 'Hard '
-    parameters = ['saturation', 'value']
+    parameters = ['Saturation', 'Value']
+    file_types = ['svg', 'png']
 
 def get_conditions(df, styles):
     """Get conditions for np.select based on unique values in dataframe"""
@@ -69,6 +72,8 @@ def ascii_histogram(row, max_width=50, bar_char='█'):
         bar_length = int(math.floor(value * scale))
         bar = bar_char * bar_length
         print(f"{label:12}: {bar} ({value})")
+
+
 def main():
     """Main processing pipeline"""
 
@@ -127,12 +132,45 @@ def main():
                 'Significant (α=0.0083)': p < 0.0083  # Bonferroni-adjusted threshold
             })
 
+            plot_df = pd.DataFrame({
+                param: pd.concat([style, hard_style], ignore_index=True),
+                'Type': [genre] * len(style) + [(config.prefix + genre)] * len(hard_style)
+            })
+
+            # Add a 'Genre' column for the x-axis
+            plot_df['Genre'] = genre
+
+            # Set Seaborn style
+            sns.set(style="whitegrid")
+
+            # Initialize the plot
+            plt.figure(figsize=(8, 6))
+
+            # Create the split violin plot
+
+
+            sns.violinplot(
+                y=param,
+                hue='Type',
+                data=plot_df,
+                split=True,
+                palette=sns.color_palette(['#5B9BD5', '#FF5555']),
+                inner='quartile'
+            )
+
+            # Customize the plot
+            plt.title(f'{param}: {genre} vs {config.prefix + genre}')
+            plt.legend(title='Type')
+
+            # Save the plot
+            for file_type in config.file_types:
+                plt.savefig(f'../figures/{file_type}/{genre.lower().replace(" ", "_")}_{param}_violin.{file_type}')
+
+
+
     results_df = pd.DataFrame(results)
     print(results)
     print(results_df.head(6))
-
-
-
 
 
 if __name__ == "__main__":
