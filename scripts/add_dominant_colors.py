@@ -9,13 +9,8 @@ from tqdm import tqdm
 
 VERBOSE = False
 
-df = pd.read_csv('.fetched_data/discogs_releases.csv', sep=",", quotechar='"')
-
-color_lut_256 = numpy.load('../lut_hsv.npy')
-
-file = open("../color_buckets.pkl", 'rb')
-color_map_idx_to_string = pickle.load(file)
-file.close()
+COLOR_LUT_256 = None
+COLOR_MAP_IDX = None
 
 
 def calculate_dominant_color(row):
@@ -53,22 +48,34 @@ def calculate_dominant_color(row):
             # image[i,j] is the rgb value of a pixel in the jpg
             # color_lut_256 is the color of that pixel
             rgb = image[i, j]
-            color = color_lut_256[rgb[0], rgb[1], rgb[2]]
+            color = COLOR_LUT_256[rgb[0], rgb[1], rgb[2]]
             color_map_image[i, j] = color
 
     flat = color_map_image.ravel()
     counts = np.bincount(flat)
     top3_colors_idx = np.argsort(counts)[-3:][::-1]
-    top3_colors = ",".join(color_map_idx_to_string[x] for x in top3_colors_idx)
+    top3_colors = ",".join(COLOR_MAP_IDX[x] for x in top3_colors_idx)
 
     return top3_colors
 
+def add_dominant_colors():
+    df = pd.read_csv('.fetched_data/discogs_releases.csv', sep=",", quotechar='"')
 
-# start
-print("Calculating dominant colors...")
-tqdm.pandas()
-df["dominant_colors"] = df.progress_apply(calculate_dominant_color, axis=1)
-if VERBOSE:
-    print("Done!")
+    COLOR_LUT_256 = numpy.load('../lut_hsv.npy')
 
-df.to_csv('dicogs_with_colors.csv', index=False)
+    file = open("../color_buckets.pkl", 'rb')
+    COLOR_MAP_IDX = pickle.load(file)
+    file.close()
+
+
+    # start
+    print("Calculating dominant colors...")
+    tqdm.pandas()
+    df["dominant_colors"] = df.progress_apply(calculate_dominant_color, axis=1)
+    if VERBOSE:
+        print("Done!")
+
+    df.to_csv('dicogs_with_colors.csv', index=False)
+
+if __name__ == "__main__":
+    add_dominant_colors()
