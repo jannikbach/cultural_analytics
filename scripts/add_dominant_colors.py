@@ -73,8 +73,8 @@ class ColorAnalyzer:
 
             return {
                 "colors": self._top_colors(color_map),
-                "saturation": sat_map.mean(),
-                "value": val_map.mean()
+                "Saturation": sat_map.mean(),
+                "Value": val_map.mean()
             }
         except IndexError as e:
             raise ImageProcessingError(f"Invalid image dimensions: {e}") from e
@@ -95,7 +95,7 @@ def process_data(df: pd.DataFrame, analyzer: ColorAnalyzer) -> pd.DataFrame:
                 return analyzer.analyze(image)
             except ImageProcessingError as e:
                 logger.debug(f"Processing failed for {row.name}: {e}")
-        return {"colors": "N/A", "saturation": np.nan, "value": np.nan}
+        return {"colors": "N/A", "Saturation": np.nan, "Value": np.nan}
 
     logger.info("Analyzing album covers...")
     tqdm.pandas(desc="Processing images")
