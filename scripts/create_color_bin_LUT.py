@@ -1,157 +1,222 @@
 import pickle
 import numpy as np
 
-# Constants
-NUM_BINS = 256
-COLOR_BIT_DEPTH = 8
-BIN_WIDTH = 1  # 2**COLOR_BIT_DEPTH // NUM_BINS
-
-# Color mappings
-HUE_TO_COLOR = {
-    0: "Red",
-    30: "Orange",
-    60: "Yellow",
-    90: "Chartreuse",
-    120: "Green",
-    150: "Spring Green",
-    180: "Cyan",
-    210: "Azure",
-    240: "Blue",
-    270: "Violet",
-    300: "Magenta",
-    330: "Rose",
-    360: "Red"
-}
-
-COLOR_BUCKETS = {
-    0: "Red",
-    1: "Orange",
-    2: "Yellow",
-    3: "Chartreuse",
-    4: "Green",
-    5: "Spring Green",
-    6: "Cyan",
-    7: "Azure",
-    8: "Blue",
-    9: "Violet",
-    10: "Magenta",
-    11: "Rose",
-    12: "Black",
-    13: "White",
-    14: "Gray"
-}
-
-# Pre-calculated values
-SATURATION_THRESHOLD = 2 ** COLOR_BIT_DEPTH // 10
-VALUE_THIRD = (2 ** COLOR_BIT_DEPTH) / 3
-VALUE_TWO_THIRDS = 2 * VALUE_THIRD
-
-
-def create_rgb_lut():
-    """Generate RGB lookup table using vectorized operations."""
-    indices = np.indices((NUM_BINS, NUM_BINS, NUM_BINS))
-    return np.moveaxis(indices * BIN_WIDTH, 0, -1).astype(np.float32)
-
-
 def rgb_to_hsv(rgb):
-    """Convert RGB array to HSV color space."""
-    rgb_normalized = rgb.astype(np.float32) / 255.0
+    """
+        rgb: NumPy array of shape (a, a, a, 3), with dtype in [0..255].
+        returns: HSV array of shape (a, a, a, 3) where:
+            HSV[..., 0] (Hue) is in [0..360]
+            HSV[..., 1] (Saturation) is in [0..255]
+            HSV[..., 2] (Value) is in [0..255]
+        """
 
-    cmax = np.max(rgb_normalized, axis=-1)
-    cmin = np.min(rgb_normalized, axis=-1)
+    # Convert to float in [0..1]
+    rgb_float = rgb.astype(np.float32) / 255.0
+
+    # Separate R, G, B channels
+    r = rgb_float[..., 0]
+    g = rgb_float[..., 1]
+    b = rgb_float[..., 2]
+
+    # Compute cmax, cmin, and delta
+    cmax = np.max(rgb_float, axis=-1)
+    cmin = np.min(rgb_float, axis=-1)
     delta = cmax - cmin
 
+    # Initialize Hue, Saturation, Value arrays
     hue = np.zeros_like(cmax)
-    saturation = np.zeros_like(cmax)
+    sat = np.zeros_like(cmax)
+    val = cmax  # Value is the max channel
 
-    # Hue calculation
-    mask = delta != 0
-    r, g, b = np.moveaxis(rgb_normalized, -1, 0)
+    # Mask where delta != 0 (to avoid division by zero)
+    mask_delta = (delta != 0)
 
-    red_mask = mask & (cmax == r)
-    green_mask = mask & (cmax == g)
-    blue_mask = mask & (cmax == b)
+    # ----- HUE calculation -----
+    # if R is max => Hue = (G - B) / delta % 6
+    # if G is max => Hue = (B - R) / delta + 2
+    # if B is max => Hue = (R - G) / delta + 4
 
-    hue[red_mask] = ((g[red_mask] - b[red_mask]) / delta[red_mask]) % 6
-    hue[green_mask] = ((b[green_mask] - r[green_mask]) / delta[green_mask]) + 2
-    hue[blue_mask] = ((r[blue_mask] - g[blue_mask]) / delta[blue_mask]) + 4
+    idx = (cmax == r) & mask_delta
+    hue[idx] = ((g[idx] - b[idx]) / delta[idx]) % 6
 
+    idx = (cmax == g) & mask_delta
+    hue[idx] = ((b[idx] - r[idx]) / delta[idx]) + 2
+
+    idx = (cmax == b) & mask_delta
+    hue[idx] = ((r[idx] - g[idx]) / delta[idx]) + 4
+
+    # Now hue is in [0..6], convert to [0..360]
     hue_degrees = hue * 60.0
-    saturation = np.divide(delta, cmax, out=np.zeros_like(delta), where=cmax != 0)
 
-    return np.stack([
-        hue_degrees,
-        saturation * 255,
-        cmax * 255
-    ], axis=-1)
+    # ----- SATURATION calculation -----
+    # Sat = delta / cmax (but if cmax = 0 => sat = 0)
+    mask_cmax = (cmax != 0)
+    sat[mask_cmax] = delta[mask_cmax] / cmax[mask_cmax]
 
+    # Convert saturation and value to [0..255]
+    sat_255 = sat * 255.0
+    val_255 = val * 255.0
 
-def create_hue_map(hsv_data):
-    """Generate hue classification map from HSV data."""
-    hue_map = np.zeros(hsv_data.shape[:3], dtype=np.uint8)
-    h, s, v = np.moveaxis(hsv_data, -1, 0)
+    # Finally stack them into an HSV array of shape (a,a,a,3)
+    # Hue in [0..360], Sat in [0..255], Val in [0..255]
+    hsv = np.stack([hue_degrees, sat_255, val_255], axis=-1)
 
-    # Calculate masks
-    low_sat_mask = s < SATURATION_THRESHOLD
-    black_mask = low_sat_mask & (v < VALUE_THIRD)
-    white_mask = low_sat_mask & (v > VALUE_TWO_THIRDS)
-    gray_mask = low_sat_mask & ~black_mask & ~white_mask
+    return hsv
 
-    # Handle chromatic colors
-    hue_rounded = np.round(h / 30) * 30
-    hue_buckets = ((hue_rounded % 360) // 30).astype(np.uint8)
+def create_buckets():
+    # Create a 3D LUT
+    num_bins = 256
+    color_bit_depth = 8
+    bin_width = 1#2**color_bit_depth // num_bins
 
-    # Apply masks
-    hue_map[black_mask] = 12
-    hue_map[white_mask] = 13
-    hue_map[gray_mask] = 14
-    hue_map[~low_sat_mask] = hue_buckets[~low_sat_mask]
-
-    return hue_map
+    # Initialize the LUT: (num_bins, num_bins, num_bins, 3)
+    lut_rgb = np.zeros((num_bins, num_bins, num_bins, 3), dtype=np.float32)
+    lut_hsv = np.zeros((num_bins, num_bins, num_bins, 3), dtype=np.float32)
 
 
-def save_data(hue_map, sat_map, val_map):
-    """Save generated lookup tables."""
+    # Populate the LUT
+    for r_idx in range(num_bins):
+        for g_idx in range(num_bins):
+            for b_idx in range(num_bins):
+                # OpenCV expects BGR order
+                lut_rgb[r_idx,g_idx,b_idx] = np.array([r_idx, g_idx, b_idx], dtype=np.uint8) * bin_width
+
+    lut_hsv = rgb_to_hsv(lut_rgb)
+
+    hue_to_color = {
+        0: "Red",
+        30: "Orange",
+        60: "Yellow",
+        90: "Chartreuse",
+        120: "Green",
+        150: "Spring Green",
+        180: "Cyan",
+        210: "Azure",
+        240: "Blue",
+        270: "Violet",
+        300: "Magenta",
+        330: "Rose",
+        360: "Red"  # 360° wraps around to Red
+    }
+    color_buckets = {
+        0: "Red",
+        1: "Orange",
+        2: "Yellow",
+        3: "Chartreuse",
+        4: "Green",
+        5: "Spring Green",
+        6: "Cyan",
+        7: "Azure",
+        8: "Blue",
+        9: "Violet",
+        10: "Magenta",
+        11: "Rose",
+        12: "Black",
+        13: "White",
+        14: "Gray"
+    }
+    color_to_bucket = {color: bucket for bucket, color in color_buckets.items()}
+
+    saturation_threshold = 2 ** color_bit_depth // 10 #colors with less saturation than this will be considered gray
+    hue_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+    for index in np.ndindex(hue_map.shape):
+        r, g, b = index
+        hsv = lut_hsv[r, g, b]
+        if hsv[1] < saturation_threshold:
+            if hsv[2] < (2**color_bit_depth / 3):
+                hue_map[r, g, b] = 12 # black
+            elif hsv[2] > (2*(2**color_bit_depth) / 3):
+                hue_map[r, g, b] = 13 # white
+            else:
+                hue_map[r, g, b] = 14 # gray
+        else:
+            # find the closest hue
+            closest_key = min(hue_to_color.keys(), key=lambda k: abs(k - hsv[0]))
+            closest_hue = hue_to_color[closest_key]
+            bucket = color_to_bucket.get(closest_hue)
+            hue_map[r, g, b] = bucket
+
+    sat_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+    for index in np.ndindex(sat_map.shape):
+        r, g, b = index
+        hsv = lut_hsv[r, g, b]
+        sat_map[r, g, b] = hsv[1]
+
+    val_map = np.zeros((num_bins, num_bins, num_bins), dtype=np.uint8)
+    for index in np.ndindex(val_map.shape):
+        r, g, b = index
+        hsv = lut_hsv[r, g, b]
+        val_map[r, g, b] = hsv[2]
+
+
+    # Test:
+    r, g, b = 0, 0, 31
+    print("Green:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+    r, g, b = 0, 20, 0
+    print("Blue:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+
+    r, g, b = 15, 0, 0
+    print("Red:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+
+    r, g, b = 15, 15, 0
+    print("Yellow:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+    r, g, b = 0, 0, 0
+    print("Black:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+    r, g, b = 31, 31, 31
+    print("White:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+    r, g, b = 12, 12, 12
+    print("Gray:", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+    r, g, b = 255, 68, 0
+    print("Should Be Orange not Red (Hue 16):", (r, g, b))
+    print("RGB:", lut_rgb[r, g, b])
+    print("HSV:", lut_hsv[r, g, b])
+    print("Color by Map :", color_buckets[hue_map[r, g, b]])
+    print("")
+
+
+    # Save the LUTs
     np.save("../lut_hue.npy", hue_map)
     np.save("../lut_sat.npy", sat_map)
     np.save("../lut_val.npy", val_map)
 
-    with open("../color_buckets.pkl", "wb") as f:
-        pickle.dump(COLOR_BUCKETS, f)
+    # Save to 'color_buckets.pkl'
+    with open("../color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
+        pickle.dump(color_buckets, f)
 
-
-def test_color_mapping(lut_rgb, lut_hsv, hue_map, test_cases):
-    """Test color classification for given test cases."""
-    for (r, g, b), name in test_cases:
-        print(f"{name}:", (r, g, b))
-        print("RGB:", lut_rgb[r, g, b])
-        print("HSV:", lut_hsv[r, g, b])
-        print("Color by Map:", COLOR_BUCKETS[hue_map[r, g, b]])
-        print()
-
-
-# Main execution
 if __name__ == "__main__":
-    # Generate LUTs
-    lut_rgb = create_rgb_lut()
-    lut_hsv = rgb_to_hsv(lut_rgb)
-
-    # Create classification maps
-    hue_map = create_hue_map(lut_hsv)
-    sat_map = lut_hsv[..., 1].astype(np.uint8)
-    val_map = lut_hsv[..., 2].astype(np.uint8)
-
-    # Test cases
-    test_cases = [
-        ((0, 0, 31), "Green"),
-        ((0, 20, 0), "Blue"),
-        ((15, 0, 0), "Red"),
-        ((15, 15, 0), "Yellow"),
-        ((0, 0, 0), "Black"),
-        ((31, 31, 31), "White"),
-        ((12, 12, 12), "Gray"),
-        ((255, 68, 0), "Should Be Orange")
-    ]
-
-    test_color_mapping(lut_rgb, lut_hsv, hue_map, test_cases)
-    save_data(hue_map, sat_map, val_map)
+    create_buckets()
