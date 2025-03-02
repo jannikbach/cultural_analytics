@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Rectangle
 import matplotlib.colors as mcolors
+import os
+from utils import get_base_path, HARD_STYLES
 
 
 VERBOSE = False
@@ -12,12 +14,12 @@ LAME_PLOT = False
 
 df = pd.read_csv('.fetched_data/discogs_with_colors.csv', sep=",", quotechar='"')
 
-file = open("../color_buckets.pkl", 'rb')
+file = open(os.path.join(get_base_path(), "color_buckets.pkl"), 'rb')
 color_buckets = pickle.load(file)
 file.close()
 
 # get the unique Subgenres from the dataset
-subgenres = ['House', 'Hard House', 'Techno', 'Hard Techno', 'Trance', 'Hard Trance']
+subgenres = HARD_STYLES
 
 # create a nested dict with the unique subgenres as keys and the color histogram as values
 subgenre_color_histogram = {}
@@ -222,12 +224,12 @@ def make_circle_histogram(height_px, lw_bars, lw_grid, lw_border, historagm, tit
 file_types = ['svg', 'png']
 
 for file_type in file_types:
-    Path(f'../figures/{file_type}').mkdir(parents=True, exist_ok=True)
+    Path(get_base_path(), f'figures/{file_type}').mkdir(parents=True, exist_ok=True)
 
 for genre, hist in subgenre_color_histogram.items():
     fig, ax = make_circle_histogram(height_px=500, lw_bars=0.7, lw_grid=0.5, lw_border=1,
                                     historagm=hist, title=genre)
     for file_type in file_types:
-        plt.savefig(f'../figures/{file_type}/{genre.lower().replace(" ", "_")}_radial_hist.{file_type}')
+        plt.savefig(os.path.join(get_base_path(), f'figures/{file_type}/{genre.lower().replace(" ", "_")}_radial_hist.{file_type}'))
     if VERBOSE:
         plt.show()

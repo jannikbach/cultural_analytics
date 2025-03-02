@@ -7,14 +7,15 @@ import numpy as np
 from scipy.stats import shapiro, levene, ttest_ind, mannwhitneyu
 import seaborn as sns
 import matplotlib.pyplot as plt
+from utils import get_base_path, HARD_STYLES_WITHOUT_HARD
 
 
 @dataclass(frozen=True)
 class Config:
-    base_path: Path = Path("../")
+    base_path: Path = Path(get_base_path())
     data_path: Path = Path("./.fetched_data/")
     csv: Path = data_path / "discogs_with_colors.csv"
-    subgenres = ['House','Techno', 'Trance']
+    subgenres = HARD_STYLES_WITHOUT_HARD
     prefix = 'Hard '
     parameters = ['Saturation', 'Value']
     file_types = ['svg', 'png']
