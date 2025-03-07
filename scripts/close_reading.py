@@ -73,26 +73,60 @@ def main():
         style = df[df['Defining Style'] == genre]
         hard_style = df[df['Defining Style'] == (config.prefix + genre)]
 
-        artists = set()
-        hard_artists = set()
+        ####
+        # Split into artists and song parts, then extract artists
+        def get_artists(origin):
+            artists = (
+                origin['Release Name']
+                .str.split(' - ', n=1).str[0]  # Split on hyphen and keep the artist part
+                .str.split(
+                    r',|[fF][eE][aA][tT]\.*|[fF][tT]\.*|&|[Vv][Ss]|[fF][eE][aA][tT][uU][rR][iI][nN][gG]')  # Split on commas with optional spaces
+                .explode()  # Break list of artists into separate rows
+                .str.strip()  # Remove any leading/trailing whitespace
+                .str.strip('*')  # Remove any trailing asterisks
+            )
 
-        def get_artists(origin, set_to_add):
-            release = origin['Release Name']
-            release = release.apply(lambda x: x.split(' - ')[0])
+            # Convert to a set of unique artists
+            artists_set = set(artists.unique())
+            if '' in artists_set:
+                artists_set.remove('')  # Remove empty strings
+            if 'Various' in artists_set:
+                artists_set.remove('Various')  # Remove 'Various' artists
+            if 'Unknown Artist' in artists_set:
+                artists_set.remove('Unknown Artist')  # Remove 'Various Artists' artists
+            if 'S' in artists_set:
+                artists_set.remove('S')  # Remove 'S' artists
+            return artists_set
 
-            def apply_artists_to_set(x):
-                artists = split_artists(x)
-                for artist in artists:
-                    set_to_add.add(artist)
+        artists = get_artists(style)
+        hard_artists = get_artists(hard_style)
 
-            release.apply(apply_artists_to_set)
+        shared_artists = shared_artists.union(artists.intersection(hard_artists))
 
-        get_artists(style, artists)
-        get_artists(hard_style, hard_artists)
+    ###
+    # Filter the dataframe for shared artists
+    # Split to get the artist part (before the hyphen)
+    artist_part = df['Release Name'].str.split('-', n=1).str[0]
 
-        shared_artists = artists.intersection(hard_artists)
+    # make shared artists a regex with subsequent optional white spaces or comma
+    # Define prefix and suffix
+    prefix = r"\b(?=\w)" # start of word
+    suffix = r"\b(?<=\w)" # end of word
 
-        print(shared_artists)
+    # Modify strings and escape special characters
+    escaped_artists = [re.escape(s) for s in shared_artists]
+    escaped_pattern = [prefix + s + suffix for s in escaped_artists]
+    # Escape special characters in shared_artists and join into a regex pattern
+    pattern = '|'.join(escaped_pattern)
+    regex = re.compile(pattern)
+
+    # Check if any artist in shared_artists appears as a substring in artist_part
+    mask = artist_part.str.contains(regex, regex=True)
+
+    # Filter the DataFrame
+    genre_fluid_artist_tracks = df[mask]
+    print('Shared artists:', genre_fluid_artist_tracks)
+
 
 
 if __name__ == "__main__":
