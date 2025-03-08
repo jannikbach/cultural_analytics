@@ -129,9 +129,10 @@ def load_releases_with_different_styles():
 
     # Path('.fetched_data').mkdir(parents=True, exist_ok=True)
 
-    # with open('.fetched_data/discogs_releases_different.csv', mode='w', newline='', encoding='utf-8') as file:
-    #     writer = csv.writer(file)
-    #     writer.writerow(['Id', 'Release Name', 'Artist', 'Genre', 'Subgenres', 'Cover URL'])
+    if not os.path.isfile(".fetched_data/discogs_releases_different.csv"):
+        with open('.fetched_data/discogs_releases_different.csv', mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Id', 'Release Name', 'Artist', 'Genre', 'Subgenres', 'Cover URL'])
 
     with tqdm(total=results.count, desc='artists loaded') as pbar:
         df = pd.read_csv('.fetched_data/discogs_releases_different.csv', sep=",", quotechar='"')
@@ -147,27 +148,27 @@ def load_releases_with_different_styles():
                     #releases = d.search(type='release', genre='Electronic', artist=artist.name)
 
                     for year in range(2015, 2025):
-                        for style in TOP_STYLES:
-                            releases = d.search(type='release', genre='Electronic', year=str(year), style=style, artist=artist.name)
+                    #     for style in TOP_STYLES:
+                        releases = d.search(type='release', genre='Electronic', year=str(year), artist=artist.name)
 
-                            for j in range(releases.pages):
-                                for release in list(releases.page(j)):
-                                    try:
-                                        # if release.year is None or int(release.year) < 2015:
-                                        #     continue
+                        for j in range(releases.pages):
+                            for release in list(releases.page(j)):
+                                try:
+                                    # if release.year is None or int(release.year) < 2015:
+                                    #     continue
 
-                                        # if not 'Electronic' in release.genres:
-                                        #     continue
+                                    # if not 'Electronic' in release.genres:
+                                    #     continue
 
-                                        if len(release.styles) != 1:
-                                            continue
+                                    if len(release.styles) != 1:
+                                        continue
 
-                                        # if not release.styles[0] in TOP_STYLES:
-                                        #     continue
+                                    if not release.styles[0] in TOP_STYLES:
+                                        continue
 
-                                        releases_to_save.append(release)
-                                    except Exception as e:
-                                        print(f"Error in release {release.title}: {e}")
+                                    releases_to_save.append(release)
+                                except Exception as e:
+                                    print(f"Error in release {release.title}: {e}")
 
                     styles = {release.styles[0] for release in releases_to_save}
 
@@ -186,6 +187,8 @@ def load_releases_with_different_styles():
                             writer.writerow([release.id, release_name, artist.name, genres, subgenres, cover_url])
                 except Exception as e:
                     print(f"Error in artist {artist.name}: {e}")
+
+    print("end")
 
 if __name__ == "__main__":
     load_releases_with_different_styles()

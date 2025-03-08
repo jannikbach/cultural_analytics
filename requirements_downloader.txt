@@ -1,0 +1,5 @@
+python3-discogs-client
+python-dotenv~=1.0.1
+numpy~=2.2.1
+pandas~=2.2.3
+tqdm~=4.67.1

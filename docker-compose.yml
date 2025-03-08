@@ -1,0 +1,7 @@
+services:
+  data_downloader:
+    build: .
+    volumes:
+      - ./.downloaded_data:/app/.fetched_data
+    env_file:
+      - .env
