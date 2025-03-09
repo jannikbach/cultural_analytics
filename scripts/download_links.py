@@ -147,28 +147,28 @@ def load_releases_with_different_styles():
                     # releases = artist.releases
                     #releases = d.search(type='release', genre='Electronic', artist=artist.name)
 
-                    for year in range(2015, 2025):
+                    #for year in range(2015, 2025):
                     #     for style in TOP_STYLES:
-                        releases = d.search(type='release', genre='Electronic', year=str(year), artist=artist.name)
+                    releases = d.search(type='release', genre='Electronic', year=str(year), artist=artist.name)
 
-                        for j in range(releases.pages):
-                            for release in list(releases.page(j)):
-                                try:
-                                    # if release.year is None or int(release.year) < 2015:
-                                    #     continue
+                    for j in range(releases.pages):
+                        for release in list(releases.page(j)):
+                            try:
+                                if release.year is None or int(release.year) < 2015:
+                                    continue
 
-                                    # if not 'Electronic' in release.genres:
-                                    #     continue
+                                if not 'Electronic' in release.genres:
+                                    continue
 
-                                    if len(release.styles) != 1:
-                                        continue
+                                if len(release.styles) != 1:
+                                    continue
 
-                                    if not release.styles[0] in TOP_STYLES:
-                                        continue
+                                if not release.styles[0] in TOP_STYLES:
+                                    continue
 
-                                    releases_to_save.append(release)
-                                except Exception as e:
-                                    print(f"Error in release {release.title}: {e}")
+                                releases_to_save.append(release)
+                            except Exception as e:
+                                print(f"Error in release {release.title}: {e}")
 
                     styles = {release.styles[0] for release in releases_to_save}
 
