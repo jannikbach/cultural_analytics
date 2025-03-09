@@ -149,7 +149,7 @@ def load_releases_with_different_styles():
 
                     #for year in range(2015, 2025):
                     #     for style in TOP_STYLES:
-                    releases = d.search(type='release', genre='Electronic', year=str(year), artist=artist.name)
+                    releases = d.search(type='release', genre='Electronic', artist=artist.name)
 
                     for j in range(releases.pages):
                         for release in list(releases.page(j)):
@@ -157,8 +157,8 @@ def load_releases_with_different_styles():
                                 if release.year is None or int(release.year) < 2015:
                                     continue
 
-                                if not 'Electronic' in release.genres:
-                                    continue
+                                # if not 'Electronic' in release.genres:
+                                #     continue
 
                                 if len(release.styles) != 1:
                                     continue
