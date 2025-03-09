@@ -8,6 +8,7 @@ import os
 from tqdm import tqdm
 import pandas as pd
 from utils import TOP_STYLES
+from collections import Counter
 
 dotenv.load_dotenv()
 
@@ -180,6 +181,8 @@ def load_releases_with_different_styles():
                             continue
                         
                         for release in releases_to_save:
+                            art:discogs_client.Artist = None
+                            art.id
                             release_name = release.title
                             genres = ', '.join(release.genres) if release.genres else 'N/A'
                             subgenres = ', '.join(release.styles) if release.styles else 'N/A'
@@ -188,7 +191,44 @@ def load_releases_with_different_styles():
                 except Exception as e:
                     print(f"Error in artist {artist.name}: {e}")
 
-    print("end")
+def load_releases_with_artist():
+    api_key = os.getenv('DISCOGS_API_KEY')
+
+    # Initialize Discogs client
+    d = discogs_client.Client('album-cover-project', user_token=api_key)
+
+    # Path('.fetched_data').mkdir(parents=True, exist_ok=True)
+
+    if not os.path.isfile(".fetched_data/discogs_releases_artists.csv"):
+        with open('.fetched_data/discogs_releases_artists.csv', mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(['Id', 'Release Name', 'Artist-Ids', 'Year', 'Subgenres', 'Cover URL'])
+
+    for year in range(2025, 2020, -1):
+        results = d.search(type='release', genre='Electronic', year=year)
+        with tqdm(total=results.count, desc=f'releases loaded for {year}') as pbar:
+            for i in range(results.pages):
+                for release in list(results.page(i)):
+                    pbar.update(1)
+
+                    try:
+                        styles = list((Counter(release.styles) & Counter(TOP_STYLES)).elements())
+
+                        if len(styles) == 0:
+                            continue
+
+                        with open('.fetched_data/discogs_releases_artists.csv', mode='a', newline='', encoding='utf-8') as file:
+                            writer = csv.writer(file)
+                            release_name = release.title
+                            subgenres = ';'.join(styles)
+                            cover_url = release.images[0]['uri'] if release.images else 'N/A'
+
+                            for artist in release.artists:
+                                writer.writerow([release.id, release_name, artist.id, year, subgenres, cover_url])
+
+                        
+                    except Exception as e:
+                        print(f"Error in release {release.id}: {e}")
 
 if __name__ == "__main__":
-    load_releases_with_different_styles()
+    load_releases_with_artist()
