@@ -202,7 +202,7 @@ def load_releases_with_artist():
     if not os.path.isfile(".fetched_data/discogs_releases_artists.csv"):
         with open('.fetched_data/discogs_releases_artists.csv', mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow(['Id', 'Release Name', 'Artist-Ids', 'Year', 'Subgenres', 'Cover URL'])
+            writer.writerow(['Id', 'Release Name', 'Artist-Id', 'Year', 'Subgenres', 'Cover URL'])
 
     for year in range(2025, 2020, -1):
         results = d.search(type='release', genre='Electronic', year=year)
