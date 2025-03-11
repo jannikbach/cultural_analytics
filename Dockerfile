@@ -8,4 +8,4 @@ RUN pip install -r requirements_add_colors.txt
 COPY /start.sh . 
 COPY /scripts/ .
 
-CMD ["/usr/bin/bash", "/start.sh"]
+CMD ["/usr/bin/bash", "start.sh"]
