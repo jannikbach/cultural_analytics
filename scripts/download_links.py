@@ -204,7 +204,7 @@ def load_releases_with_artist():
             writer = csv.writer(file)
             writer.writerow(['Id', 'Release Name', 'Artist-Id', 'Year', 'Subgenres', 'Cover URL'])
 
-    for year in range(2025, 2020, -1):
+    for year in range(2025, 2016, -1):
         results = d.search(type='release', genre='Electronic', year=year)
         with tqdm(total=results.count, desc=f'releases loaded for {year}') as pbar:
             for i in range(results.pages):

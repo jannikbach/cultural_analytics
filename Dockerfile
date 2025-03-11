@@ -3,7 +3,9 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY requirements_downloader.txt .
 
-RUN pip install -r requirements_downloader.txt
+RUN pip install -r requirements_all_colors.txt
+
+COPY /start.sh . 
 COPY /scripts/ .
 
-CMD [ "python", "download_links.py" ]
+CMD ["/start.sh"]

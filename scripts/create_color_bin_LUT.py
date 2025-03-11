@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+from utils import get_base_path
 
 def rgb_to_hsv(rgb):
     """
@@ -210,12 +211,12 @@ def create_buckets():
 
 
     # Save the LUTs
-    np.save("../lut_hue.npy", hue_map)
-    np.save("../lut_sat.npy", sat_map)
-    np.save("../lut_val.npy", val_map)
+    np.save(f"{get_base_path}lut_hue.npy", hue_map)
+    np.save(f"{get_base_path}lut_sat.npy", sat_map)
+    np.save(f"{get_base_path}lut_val.npy", val_map)
 
     # Save to 'color_buckets.pkl'
-    with open("../color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
+    with open(f"{get_base_path}color_buckets.pkl", "wb") as f:   # note 'wb' for write-binary
         pickle.dump(color_buckets, f)
 
 if __name__ == "__main__":
