@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-COPY requirements_downloader.txt .
+COPY requirements_all_colors.txt .
 
 RUN pip install -r requirements_all_colors.txt
 
